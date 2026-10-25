@@ -1,0 +1,82 @@
+name: Sync Repository Clone Mirror to GitLab
+
+on:
+  workflow_call:
+    inputs:
+      gitlab_host:
+        description: 'GitLab instance host domain'
+        required: false
+        type: string
+        default: 'gitlab.com'
+      gitlab_project_path:
+        description: 'Target GitLab project path (e.g. "group/project" or "username/project"). Defaults to caller repository name.'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      GITLAB_TOKEN:
+        description: 'GitLab personal access token or project access token with write_repository scope'
+        required: true
+
+  workflow_dispatch:
+    inputs:
+      gitlab_project_path:
+        description: 'Target GitLab project path (e.g. "group/project" or "username/project")'
+        required: false
+        type: string
+        default: ''
+      gitlab_host:
+        description: 'GitLab instance host domain'
+        required: false
+        type: string
+        default: 'gitlab.com'
+
+concurrency:
+  group: gitlab-mirror-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync repository to GitLab
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GitHub repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Push to GitLab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_HOST: ${{ inputs.gitlab_host || vars.GITLAB_HOST || 'gitlab.com' }}
+          GITLAB_PROJECT_PATH: ${{ inputs.gitlab_project_path || vars.GITLAB_PROJECT_PATH || github.repository }}
+        run: |
+          if [ -z "$GITLAB_TOKEN" ]; then
+            echo "::error::Secret GITLAB_TOKEN is not configured or passed to the workflow."
+            exit 1
+          fi
+
+          echo "::add-mask::$GITLAB_TOKEN"
+          echo "Configuring GitLab remote for ${GITLAB_PROJECT_PATH} on ${GITLAB_HOST}..."
+
+          # Fetch all branches and tags from GitHub origin
+          git fetch --prune --tags origin '+refs/heads/*:refs/remotes/origin/*'
+
+          # Remove origin/HEAD reference to avoid pushing an invalid 'refs/heads/HEAD' ref
+          git update-ref -d refs/remotes/origin/HEAD 2>/dev/null || true
+
+          # Configure GitLab remote with authentication token masked
+          GITLAB_REMOTE_URL="https://oauth2:${GITLAB_TOKEN}@${GITLAB_HOST}/${GITLAB_PROJECT_PATH}.git"
+          git remote add gitlab "$GITLAB_REMOTE_URL"
+
+          echo "Synchronizing branches to GitLab..."
+          git push --prune gitlab '+refs/remotes/origin/*:refs/heads/*'
+
+          echo "Synchronizing tags to GitLab..."
+          git push gitlab --tags
+
+          echo "Repository successfully synchronized to GitLab!"

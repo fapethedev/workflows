@@ -41,8 +41,10 @@ You can contribute in many ways:
 
 Every workflow in `.github/workflows/` intended for reuse **must** adhere to the following architectural requirements:
 
-#### A. Explicit `workflow_call` Interface
-Declare all inputs, secrets, and outputs clearly with comprehensive descriptions:
+#### A. Explicit `workflow_call` Interface & Casing Conventions
+Declare all inputs, secrets, and outputs clearly with comprehensive descriptions. Respect standard casing conventions:
+- **`inputs`**: Use lowercase `snake_case` (e.g., `gitlab_project_path`, `node_version`).
+- **`secrets`**: Use uppercase `UPPER_SNAKE_CASE` (e.g., `GITLAB_TOKEN`, `NPM_TOKEN`), as secret names are case-sensitive across GitHub Actions.
 
 ```yaml
 name: Node CI
@@ -50,27 +52,45 @@ name: Node CI
 on:
   workflow_call:
     inputs:
-      node-version:
+      node_version:
         description: 'Node.js version to test against (e.g., 20.x or matrix json)'
         required: false
         type: string
         default: '20.x'
-      run-tests:
+      run_tests:
         description: 'Whether to execute the test suite'
         required: false
         type: boolean
         default: true
     secrets:
-      npm-token:
+      NPM_TOKEN:
         description: 'NPM registry access token for private packages'
         required: false
     outputs:
-      test-result:
+      test_result:
         description: 'Status of the test execution'
         value: ${{ jobs.test.outputs.status }}
 ```
 
-#### B. Principle of Least Privilege (`permissions`)
+#### B. Fallback Strategy with Repository Variables (`vars`)
+When designing reusable workflows, support both inline YAML inputs and GitHub Repository/Organization Variables (`vars`). This enables consumer repositories to keep their YAML minimal without hardcoding configuration in code:
+
+```yaml
+env:
+  GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+  GITLAB_PROJECT_PATH: ${{ inputs.gitlab_project_path || vars.GITLAB_PROJECT_PATH || github.repository }}
+```
+
+#### C. Isolated Concurrency Scoping
+Always namespace concurrency groups with `${{ github.repository }}` so concurrent runs across different caller repositories do not cancel or queue each other:
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+```
+
+#### D. Principle of Least Privilege (`permissions`)
 Every job must explicitly state its minimal required permissions:
 
 ```yaml

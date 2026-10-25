@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `.github/workflows/mirror-to-gitlab.yml`: Reusable GitHub Actions workflow (`workflow_call`) to synchronize all branches and tags to a target GitLab clone mirror with secret sharing (`GITLAB_TOKEN`), repository variable fallback (`vars.GITLAB_PROJECT_PATH`), and scoped concurrency.
+
+### Changed
+- `README.md`: Added catalog entry, zero-YAML configuration guide via repository variables, and inline input examples for GitLab mirroring.
+- `CONTRIBUTING.md`: Documented input/secret casing conventions, repository variable fallback patterns, and repository-scoped concurrency best practices.
+
 ### Planned
 - Reusable workflow for Rust CI (`ci-rust.yml`) with cargo-audit and cross-compilation support.
 - Automated Slack/Discord notification reusable workflow on pipeline failure.

@@ -62,6 +62,7 @@ jobs:
 | **Docker Build & Push** | [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) | Multi-platform container build using Buildx, caching, and publishing to GHCR or Docker Hub. | `workflow_call` |
 | **Security Audit** | [`.github/workflows/security-scan.yml`](.github/workflows/security-scan.yml) | Vulnerability scanning (Trivy), secret leak detection (Gitleaks), and dependency review. | `workflow_call` |
 | **Release & Changelog** | [`.github/workflows/release.yml`](.github/workflows/release.yml) | Automated semantic version tagging, GitHub release generation, and changelog updates. | `workflow_call` |
+| **GitLab Mirror** | [`.github/workflows/mirror-to-gitlab.yml`](.github/workflows/mirror-to-gitlab.yml) | Synchronizes all branches and tags from GitHub to a target GitLab project mirror. | `workflow_call`, `workflow_dispatch` |
 | **Actionlint & Self-Check** | [`.github/workflows/actionlint.yml`](.github/workflows/actionlint.yml) | Linting and validation of GitHub Actions YAML workflows. | `workflow_call`, `push`, `pull_request` |
 
 ---
@@ -132,7 +133,62 @@ jobs:
       registry-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-### 3. Passing Secrets Securely
+### 3. Continuous Mirroring to GitLab
+
+Automatically sync all branches and tags from any GitHub repository to a target GitLab project.
+
+#### Option A: Zero plain-text configuration (Recommended)
+Configure `GITLAB_PROJECT_PATH` in GitHub repository variables (**Settings > Secrets and variables > Actions > Variables**) and `GITLAB_TOKEN` in secrets. The caller YAML stays completely clean without exposing project paths in code:
+
+```yaml
+name: Mirror to GitLab
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    name: Sync to GitLab
+    uses: fapethedev/workflows/.github/workflows/mirror-to-gitlab.yml@master
+    secrets: inherit
+```
+
+#### Option B: Inline configuration with explicit input
+You can also specify or override the target path directly via `with.gitlab_project_path`:
+
+```yaml
+name: Mirror to GitLab
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    name: Sync to GitLab
+    uses: fapethedev/workflows/.github/workflows/mirror-to-gitlab.yml@master
+    with:
+      gitlab_project_path: 'fapethedev/my-target-project'
+    secrets:
+      GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+```
+
+> [!TIP]
+> **Resolution Priority**:
+> 1. `inputs.gitlab_project_path` (if supplied in YAML)
+> 2. `vars.GITLAB_PROJECT_PATH` (configured in GitHub repository / organization variables)
+> 3. `github.repository` (default fallback when project names match)
+
+### 4. Passing Secrets Securely
 
 Reusable workflows allow passing explicit secrets or inheriting caller repository secrets:
 

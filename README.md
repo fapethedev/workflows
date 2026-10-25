@@ -63,6 +63,7 @@ jobs:
 | **Security Audit** | [`.github/workflows/security-scan.yml`](.github/workflows/security-scan.yml) | Vulnerability scanning (Trivy), secret leak detection (Gitleaks), and dependency review. | `workflow_call` |
 | **Release & Changelog** | [`.github/workflows/release.yml`](.github/workflows/release.yml) | Automated semantic version tagging, GitHub release generation, and changelog updates. | `workflow_call` |
 | **GitLab Mirror** | [`.github/workflows/mirror-to-gitlab.yml`](.github/workflows/mirror-to-gitlab.yml) | Synchronizes all branches and tags from GitHub to a target GitLab project mirror. | `workflow_call`, `workflow_dispatch` |
+| **Dependabot Auto-Merge** | [`.github/workflows/dependabot-auto-merge.yml`](.github/workflows/dependabot-auto-merge.yml) | Validates, approves, and automatically merges trusted Dependabot PRs. | `workflow_call` |
 | **Actionlint & Self-Check** | [`.github/workflows/actionlint.yml`](.github/workflows/actionlint.yml) | Linting and validation of GitHub Actions YAML workflows. | `workflow_call`, `push`, `pull_request` |
 
 ---
@@ -188,7 +189,34 @@ jobs:
 > 2. `vars.GITLAB_PROJECT_PATH` (configured in GitHub repository / organization variables)
 > 3. `github.repository` (default fallback when project names match)
 
-### 4. Passing Secrets Securely
+### 4. Dependabot Auto-Merge
+
+Automatically approve and enable auto-merge on trusted Dependabot Pull Requests (patch and minor updates):
+
+```yaml
+# .github/workflows/dependabot-automerge.yml in consumer repo
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-Merge Trusted PRs
+    uses: fapethedev/workflows/.github/workflows/dependabot-auto-merge.yml@master
+    secrets: inherit
+```
+
+> [!NOTE]
+> **Required Repository Settings**:
+> 1. Under **Settings > General > Pull Requests**, enable **Allow auto-merge**.
+> 2. Under **Settings > Actions > General > Workflow permissions**, enable **Allow GitHub Actions to create and approve pull requests**.
+
+### 5. Passing Secrets Securely
 
 Reusable workflows allow passing explicit secrets or inheriting caller repository secrets:
 

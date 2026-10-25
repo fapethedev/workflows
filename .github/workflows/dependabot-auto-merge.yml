@@ -1,0 +1,94 @@
+name: Dependabot Auto-Merge
+
+on:
+  workflow_call:
+    inputs:
+      target_update_types:
+        description: 'Allowed update types (comma-separated: version-update:semver-patch,version-update:semver-minor)'
+        required: false
+        type: string
+        default: 'version-update:semver-patch,version-update:semver-minor'
+      allow_major:
+        description: 'Whether to allow auto-merging major version updates'
+        required: false
+        type: boolean
+        default: false
+      merge_method:
+        description: 'Merge method to use: squash, rebase, or merge'
+        required: false
+        type: string
+        default: 'squash'
+      approve_pr:
+        description: 'Whether to automatically approve the PR before enabling auto-merge'
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      AUTO_MERGE_TOKEN:
+        description: 'Optional PAT or GitHub App token with write permissions. Defaults to caller GITHUB_TOKEN.'
+        required: false
+
+concurrency:
+  group: dependabot-automerge-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Dependabot Auto-Merge
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+
+    steps:
+      - name: Fetch Dependabot Metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.AUTO_MERGE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Evaluate and Enable Auto-Merge
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_MERGE_TOKEN || secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          ALLOWED_TYPES: ${{ inputs.target_update_types }}
+          ALLOW_MAJOR: ${{ inputs.allow_major }}
+          MERGE_METHOD: ${{ inputs.merge_method }}
+          APPROVE_PR: ${{ inputs.approve_pr }}
+        run: |
+          if [ -z "$PR_URL" ]; then
+            echo "::error::No pull request URL found in the event context."
+            exit 1
+          fi
+
+          echo "Evaluating Dependabot PR #$PR_NUMBER ($PR_URL)..."
+          echo "Detected update type: ${UPDATE_TYPE:-unknown}"
+
+          # Check if major update is blocked
+          if [ "$UPDATE_TYPE" = "version-update:semver-major" ] && [ "$ALLOW_MAJOR" != "true" ]; then
+            echo "::notice::Major version update detected ($UPDATE_TYPE). Skipping auto-merge per security policy."
+            exit 0
+          fi
+
+          # Check if update type is allowed
+          if [ -n "$UPDATE_TYPE" ] && [[ ",$ALLOWED_TYPES," != *",$UPDATE_TYPE,"* ]] && [ "$ALLOW_MAJOR" != "true" ]; then
+            echo "::notice::Update type ($UPDATE_TYPE) is not in allowed types ($ALLOWED_TYPES). Skipping auto-merge."
+            exit 0
+          fi
+
+          # Optional PR Approval
+          if [ "$APPROVE_PR" = "true" ]; then
+            echo "Approving Pull Request #$PR_NUMBER..."
+            gh pr review "$PR_URL" --approve --body "Dependabot auto-merge approved automatically via fapethedev/workflows." || {
+              echo "::warning::Failed to approve PR (check if branch protection requires a custom PAT)."
+            }
+          fi
+
+          # Enable auto-merge on the PR
+          echo "Enabling auto-merge ($MERGE_METHOD) on Pull Request #$PR_NUMBER..."
+          gh pr merge "$PR_URL" --auto "--$MERGE_METHOD"
+          echo "Auto-merge successfully enabled. The PR will merge once all required status checks pass."

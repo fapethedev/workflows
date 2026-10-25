@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `.github/workflows/mirror-to-gitlab.yml`: Reusable GitHub Actions workflow (`workflow_call`) to synchronize all branches and tags to a target GitLab clone mirror with secret sharing (`GITLAB_TOKEN`), repository variable fallback (`vars.GITLAB_PROJECT_PATH`), and scoped concurrency.
+- `.github/workflows/dependabot-auto-merge.yml`: Reusable GitHub Actions workflow (`workflow_call`) to evaluate, approve, and automatically merge trusted Dependabot pull requests based on semantic version updates.
 
 ### Changed
 - `README.md`: Added catalog entry, zero-YAML configuration guide via repository variables, and inline input examples for GitLab mirroring.
@@ -19,7 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Reusable workflow for Rust CI (`ci-rust.yml`) with cargo-audit and cross-compilation support.
 - Automated Slack/Discord notification reusable workflow on pipeline failure.
-- Auto-merge workflow for trusted Dependabot pull requests (`dependabot-auto-merge.yml`).
 
 ---
 
